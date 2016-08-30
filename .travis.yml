@@ -5,5 +5,7 @@ script:
   - cargo build
 addons:
   apt:
+    sources:
+      - kalakris-cmake
     packages:
       - cmake
