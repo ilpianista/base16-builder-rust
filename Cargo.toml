@@ -1,0 +1,11 @@
+[package]
+name = "base16-builder"
+version = "0.1.0"
+authors = ["Andrea Scarpino <me@andreascarpino.it>"]
+
+[dependencies]
+git2 = "^0.4"
+env_logger = "^0.3"
+log = "*"
+rustache = "^0.0"
+yaml-rust = "^0.3"
