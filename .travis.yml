@@ -3,3 +3,7 @@ rust:
   - stable
 script:
   - cargo build
+addons:
+  apt:
+    packages:
+      - cmake
