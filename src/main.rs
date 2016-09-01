@@ -6,9 +6,11 @@ extern crate yaml_rust;
 
 use git2::Repository;
 use rustache::HashBuilder;
+use rustache::Render;
 use std::fs;
 use std::fs::File;
 use std::io::Read;
+use std::str;
 use yaml_rust::YamlLoader;
 
 fn main() {
@@ -79,15 +81,21 @@ fn build_themes() {
                 Some(ext) => {
                     if ext == "yaml" {
                         info!("Reading scheme {}", scheme_file.display());
-                        //let data = HashBuilder::new();
-                        //let s = &read_yaml_file(scheme_file.to_str().unwrap())[0];
-                        //for (attr, value) in s.as_hash().unwrap().iter() {
-                        //    data.insert_string(attr.as_str().unwrap(), value.as_str().unwrap());
-                        //}
+                        let mut data = HashBuilder::new();
+                        let s = &read_yaml_file(scheme_file.to_str().unwrap())[0];
+                        for (attr, value) in s.as_hash().unwrap().iter() {
+                            data = data.insert_string(attr.as_str().unwrap(), value.as_str().unwrap());
+                        }
 
-                        //for t in vec {
-                        //    rustache::render_file(t.to_str().unwrap(), data);
-                        //}
+                        for t in &vec {
+                            let template = {
+                                let mut buffer = String::new();
+                                let mut file_contents = File::open(t.to_str().unwrap()).unwrap();
+                                file_contents.read_to_string(&mut buffer).unwrap();
+                                buffer
+                            };
+                            let template = data.render(&template).unwrap();
+                        }
                     }
                 }
             };
