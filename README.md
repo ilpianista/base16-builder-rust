@@ -10,5 +10,10 @@ A Rust implementation of a base16 builder that follows the conventions described
 
     git clone https://github.com/ilpianista/base16-builder-rust
     cd base16-builder-rust
+    cargo build
+
+## Usage
+
     cargo run
 
+Build all templates using all schemes
