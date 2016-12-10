@@ -15,10 +15,9 @@ use yaml_rust::{Yaml, YamlLoader};
 
 #[derive(Debug)]
 struct Template {
-    dir: String,
+    data: String,
     extension: String,
     output: String,
-    data: String,
 }
 
 fn main() {
@@ -66,52 +65,7 @@ fn download_sources() {
 }
 
 fn build_themes() {
-    let mut vec = vec![];
-    {
-        for template_dir in fs::read_dir("templates").unwrap() {
-            let template_dir = template_dir.unwrap();
-            let template_path = template_dir.path();
-            let template_path = template_path.to_str();
-            let template_config = &read_yaml_file(format!("{}/templates/config.yaml",
-                                                          template_path.unwrap())
-                .as_str())[0];
-            for (slug, data) in template_config.as_hash().unwrap().iter() {
-                let template_data = {
-                    let mut d = String::new();
-                    info!("Reading template {}/templates/{}.mustache",
-                          template_path.unwrap().to_string(),
-                          slug.as_str().unwrap());
-                    let f = File::open(format!("{}/templates/{}.mustache",
-                                               template_path.unwrap().to_string(),
-                                               slug.as_str().unwrap()))
-                        .unwrap();
-                    let mut input = BufReader::new(f);
-                    input.read_to_string(&mut d).unwrap();
-                    d
-                };
-
-                let template = Template {
-                    dir: template_path.unwrap().to_string(),
-                    extension: data.as_hash()
-                        .unwrap()
-                        .get(&Yaml::from_str("extension"))
-                        .unwrap()
-                        .as_str()
-                        .unwrap()
-                        .to_string(),
-                    output: data.as_hash()
-                        .unwrap()
-                        .get(&Yaml::from_str("output"))
-                        .unwrap()
-                        .as_str()
-                        .unwrap()
-                        .to_string(),
-                    data: template_data,
-                };
-                vec.push(template);
-            }
-        }
-    }
+    let templates = get_templates();
 
     let schemes_dir = fs::read_dir("schemes").unwrap();
     for scheme in schemes_dir {
@@ -159,17 +113,15 @@ fn build_themes() {
                             };
                         }
 
-                        for t in &vec {
-                            info!("Building {}/{}/base16-{}{}",
-                                  t.dir,
+                        for t in &templates {
+                            info!("Building {}/base16-{}{}",
                                   t.output,
                                   scheme_file.file_stem().unwrap().to_str().unwrap(),
                                   t.extension);
                             data = data.insert("scheme-slug",
                                                scheme_file.file_stem().unwrap().to_str().unwrap());
-                            fs::create_dir(format!("{}/{}", t.dir, t.output));
-                            let f = File::create(format!("{}/{}/base16-{}{}",
-                                                         t.dir,
+                            fs::create_dir(format!("{}", t.output));
+                            let f = File::create(format!("{}/base16-{}{}",
                                                          t.output,
                                                          scheme_file.file_stem()
                                                              .unwrap()
@@ -188,6 +140,52 @@ fn build_themes() {
             };
         }
     }
+}
+
+fn get_templates() -> Vec<Template> {
+    let mut templates = vec![];
+
+    for template_dir in fs::read_dir("templates").unwrap() {
+        let template_dir = template_dir.unwrap().path();
+        let template_dir_path = template_dir.to_str().unwrap();
+        let template_config =
+            &read_yaml_file(format!("{}/templates/config.yaml", template_dir_path).as_str())[0];
+        for (config, data) in template_config.as_hash().unwrap().iter() {
+            let template_path = format!("{}/templates/{}.mustache",
+                                        template_dir_path.to_string(),
+                                        config.as_str().unwrap());
+            info!("Reading template {}", template_path);
+
+            let template_data = {
+                let mut d = String::new();
+                let f = File::open(template_path).unwrap();
+                let mut input = BufReader::new(f);
+                input.read_to_string(&mut d).unwrap();
+                d
+            };
+
+            let template = Template {
+                data: template_data,
+                extension: data.as_hash()
+                    .unwrap()
+                    .get(&Yaml::from_str("extension"))
+                    .unwrap()
+                    .as_str()
+                    .unwrap()
+                    .to_string(),
+                output: template_dir_path.to_string() +
+                        data.as_hash()
+                    .unwrap()
+                    .get(&Yaml::from_str("output"))
+                    .unwrap()
+                    .as_str()
+                    .unwrap(),
+            };
+
+            templates.push(template);
+        }
+    }
+    templates
 }
 
 fn read_yaml_file(file: &str) -> Vec<yaml_rust::Yaml> {
