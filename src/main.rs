@@ -16,7 +16,6 @@ use yaml_rust::{Yaml, YamlLoader};
 #[derive(Debug)]
 struct Template {
     dir: String,
-    slug: String,
     extension: String,
     output: String,
     data: String,
@@ -93,7 +92,6 @@ fn build_themes() {
 
                 let template = Template {
                     dir: template_path.unwrap().to_string(),
-                    slug: slug.as_str().unwrap().to_string(),
                     extension: data.as_hash()
                         .unwrap()
                         .get(&Yaml::from_str("extension"))
@@ -113,78 +111,81 @@ fn build_themes() {
                 vec.push(template);
             }
         }
+    }
 
-        let schemes_dir = fs::read_dir("schemes").unwrap();
-        for scheme in schemes_dir {
-            let scheme_files = fs::read_dir(scheme.unwrap().path()).unwrap();
-            for sf in scheme_files {
-                let scheme_file = sf.unwrap().path();
-                match scheme_file.extension() {
-                    None => {}
-                    Some(ext) => {
-                        if ext == "yaml" {
-                            info!("Reading scheme {}", scheme_file.display());
-                            let mut data = HashBuilder::new();
-                            let s = &read_yaml_file(scheme_file.to_str().unwrap())[0];
-                            for (attr, value) in s.as_hash().unwrap().iter() {
-                                match attr.as_str().unwrap() {
-                                    "scheme" => {
-                                        data = data.insert("scheme-name", value.as_str().unwrap());
-                                    }
-                                    "author" => {
-                                        data =
-                                            data.insert("scheme-author", value.as_str().unwrap());
-                                    }
-                                    _ => {
-                                        let key = attr.as_str().unwrap();
-                                        let v = value.as_str().unwrap();
-                                        data = data.insert(key.to_string() + "-hex", v);
-                                        data = data.insert(key.to_string() + "-hex-r",
-                                                           v[0..2].to_string());
-                                        data = data.insert(key.to_string() + "-rgb-r",
-                                                           i32::from_str_radix(v[0..2].as_ref(),
-                                                                               16)
-                                                               .unwrap());
-                                        data = data.insert(key.to_string() + "-hex-g",
-                                                           v[2..4].to_string());
-                                        data = data.insert(key.to_string() + "-rgb-g",
-                                                           i32::from_str_radix(v[2..4].as_ref(),
-                                                                               16)
-                                                               .unwrap());
-                                        data = data.insert(key.to_string() + "-hex-b",
-                                                           v[4..6].to_string());
-                                        data = data.insert(key.to_string() + "-rgb-b",
-                                                           i32::from_str_radix(v[4..6].as_ref(),
-                                                                               16)
-                                                               .unwrap());
-                                    }
-                                };
-                            }
+    let schemes_dir = fs::read_dir("schemes").unwrap();
+    for scheme in schemes_dir {
+        let scheme_files = fs::read_dir(scheme.unwrap().path()).unwrap();
+        for sf in scheme_files {
+            let scheme_file = sf.unwrap().path();
+            match scheme_file.extension() {
+                None => {}
+                Some(ext) => {
+                    if ext == "yaml" {
+                        info!("Reading scheme {}", scheme_file.display());
+                        let mut data = HashBuilder::new();
+                        let s = &read_yaml_file(scheme_file.to_str().unwrap())[0];
+                        for (attr, value) in s.as_hash().unwrap().iter() {
+                            let v = value.as_str().unwrap();
+                            match attr.as_str().unwrap() {
+                                "scheme" => {
+                                    data = data.insert("scheme-name", v);
+                                }
+                                "author" => {
+                                    data = data.insert("scheme-author", v);
+                                }
+                                _ => {
+                                    let key = attr.as_str().unwrap();
+                                    data = data.insert(key.to_string() + "-hex", v);
+                                    data =
+                                        data.insert(key.to_string() + "-hex-r",
+                                                    v[0..2].to_string());
+                                    data = data.insert(key.to_string() + "-rgb-r",
+                                                       i32::from_str_radix(v[0..2].as_ref(), 16)
+                                                           .unwrap());
+                                    data =
+                                        data.insert(key.to_string() + "-hex-g",
+                                                    v[2..4].to_string());
+                                    data = data.insert(key.to_string() + "-rgb-g",
+                                                       i32::from_str_radix(v[2..4].as_ref(), 16)
+                                                           .unwrap());
+                                    data =
+                                        data.insert(key.to_string() + "-hex-b",
+                                                    v[4..6].to_string());
+                                    data = data.insert(key.to_string() + "-rgb-b",
+                                                       i32::from_str_radix(v[4..6].as_ref(), 16)
+                                                           .unwrap());
+                                }
+                            };
+                        }
 
-                            for t in &vec {
-                                info!("Building {}/{}/base16-{}{}",
-                                      t.dir,
-                                      t.output,
-                                      scheme_file.file_stem().unwrap().to_str().unwrap(),
-                                      t.extension);
-                                data = data.insert("scheme-slug", t.slug.as_ref());
-                                fs::create_dir(format!("{}/{}", t.dir, t.output));
-                                let f = File::create(format!("{}/{}/base16-{}{}",
-                                                             t.dir,
-                                                             t.output,
-                                                             scheme_file.file_stem()
-                                                                 .unwrap()
-                                                                 .to_str()
-                                                                 .unwrap(),
-                                                             t.extension))
-                                    .unwrap();
-                                let mut out = BufWriter::new(f);
-                                data.render(&t.data, &mut out).unwrap();
-                            }
+                        for t in &vec {
+                            info!("Building {}/{}/base16-{}{}",
+                                  t.dir,
+                                  t.output,
+                                  scheme_file.file_stem().unwrap().to_str().unwrap(),
+                                  t.extension);
+                            data = data.insert("scheme-slug",
+                                               scheme_file.file_stem().unwrap().to_str().unwrap());
+                            fs::create_dir(format!("{}/{}", t.dir, t.output));
+                            let f = File::create(format!("{}/{}/base16-{}{}",
+                                                         t.dir,
+                                                         t.output,
+                                                         scheme_file.file_stem()
+                                                             .unwrap()
+                                                             .to_str()
+                                                             .unwrap(),
+                                                         t.extension))
+                                .unwrap();
+                            let mut out = BufWriter::new(f);
+                            data.render(&t.data, &mut out).unwrap();
+                            println!("Built base16-{}{}",
+                                     scheme_file.file_stem().unwrap().to_str().unwrap(),
+                                     t.extension);
                         }
                     }
-                };
-            }
+                }
+            };
         }
     }
 }
