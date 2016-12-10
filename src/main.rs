@@ -16,6 +16,7 @@ use yaml_rust::{Yaml, YamlLoader};
 #[derive(Debug)]
 struct Template {
     dir: String,
+    slug: String,
     extension: String,
     output: String,
     data: String,
@@ -92,6 +93,7 @@ fn build_themes() {
 
                 let template = Template {
                     dir: template_path.unwrap().to_string(),
+                    slug: slug.as_str().unwrap().to_string(),
                     extension: data.as_hash()
                         .unwrap()
                         .get(&Yaml::from_str("extension"))
@@ -125,12 +127,38 @@ fn build_themes() {
                             let mut data = HashBuilder::new();
                             let s = &read_yaml_file(scheme_file.to_str().unwrap())[0];
                             for (attr, value) in s.as_hash().unwrap().iter() {
-                                let key = match attr.as_str().unwrap() {
-                                    "scheme" => "scheme-name".to_string(),
-                                    "author" => "scheme-author".to_string(),
-                                    _ => attr.as_str().unwrap().to_string() + "-hex",
+                                match attr.as_str().unwrap() {
+                                    "scheme" => {
+                                        data = data.insert("scheme-name", value.as_str().unwrap());
+                                    }
+                                    "author" => {
+                                        data =
+                                            data.insert("scheme-author", value.as_str().unwrap());
+                                    }
+                                    _ => {
+                                        let key = attr.as_str().unwrap();
+                                        let v = value.as_str().unwrap();
+                                        data = data.insert(key.to_string() + "-hex", v);
+                                        data = data.insert(key.to_string() + "-hex-r",
+                                                           v[0..2].to_string());
+                                        data = data.insert(key.to_string() + "-rgb-r",
+                                                           i32::from_str_radix(v[0..2].as_ref(),
+                                                                               16)
+                                                               .unwrap());
+                                        data = data.insert(key.to_string() + "-hex-g",
+                                                           v[2..4].to_string());
+                                        data = data.insert(key.to_string() + "-rgb-g",
+                                                           i32::from_str_radix(v[2..4].as_ref(),
+                                                                               16)
+                                                               .unwrap());
+                                        data = data.insert(key.to_string() + "-hex-b",
+                                                           v[4..6].to_string());
+                                        data = data.insert(key.to_string() + "-rgb-b",
+                                                           i32::from_str_radix(v[4..6].as_ref(),
+                                                                               16)
+                                                               .unwrap());
+                                    }
                                 };
-                                data = data.insert(key, value.as_str().unwrap());
                             }
 
                             for t in &vec {
@@ -139,6 +167,7 @@ fn build_themes() {
                                       t.output,
                                       scheme_file.file_stem().unwrap().to_str().unwrap(),
                                       t.extension);
+                                data = data.insert("scheme-slug", t.slug.as_ref());
                                 fs::create_dir(format!("{}/{}", t.dir, t.output));
                                 let f = File::create(format!("{}/{}/base16-{}{}",
                                                              t.dir,
