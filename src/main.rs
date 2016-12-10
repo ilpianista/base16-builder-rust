@@ -1,109 +1,167 @@
 extern crate git2;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 extern crate env_logger;
 extern crate rustache;
 extern crate yaml_rust;
 
 use git2::Repository;
-use rustache::HashBuilder;
-use rustache::Render;
+use rustache::{Render, HashBuilder};
 use std::fs;
 use std::fs::File;
-use std::io::Read;
+use std::io::{BufReader, BufWriter, Read};
 use std::str;
-use yaml_rust::YamlLoader;
+use yaml_rust::{Yaml, YamlLoader};
+
+#[derive(Debug)]
+struct Template {
+    dir: String,
+    extension: String,
+    output: String,
+    data: String,
+}
 
 fn main() {
     env_logger::init().unwrap();
 
+    // builder update ->
     download_sources();
 
+    // builder ->
+    // clean previous execution
     build_themes();
 }
 
 fn download_sources() {
     match fs::metadata("sources.yaml") {
-        Ok(_) => {},
-        Err(_) => panic!("sources.yaml not found")
+        Ok(_) => {}
+        Err(_) => panic!("sources.yaml not found"),
     };
     let sources = &read_yaml_file("sources.yaml")[0];
 
     for (source, repo) in sources.as_hash().unwrap().iter() {
-        git_clone(repo.as_str().unwrap(), format!("sources/{}", source.as_str().unwrap()).as_str());
+        git_clone(repo.as_str().unwrap(),
+                  format!("sources/{}", source.as_str().unwrap()).as_str());
     }
 
     match fs::metadata("sources/schemes/list.yaml") {
-        Ok(_) => {},
-        Err(_) => panic!("sources/schemes/list.yaml not found")
+        Ok(_) => {}
+        Err(_) => panic!("sources/schemes/list.yaml not found"),
     };
     let sources_list = &read_yaml_file("sources/schemes/list.yaml")[0];
     for (source, repo) in sources_list.as_hash().unwrap().iter() {
-        git_clone(repo.as_str().unwrap(), format!("schemes/{}", source.as_str().unwrap()).as_str());
+        git_clone(repo.as_str().unwrap(),
+                  format!("schemes/{}", source.as_str().unwrap()).as_str());
     }
 
     match fs::metadata("sources/templates/list.yaml") {
-        Ok(_) => {},
-        Err(_) => panic!("sources/templates/list.yaml not found")
+        Ok(_) => {}
+        Err(_) => panic!("sources/templates/list.yaml not found"),
     };
     let templates_list = &read_yaml_file("sources/templates/list.yaml")[0];
     for (source, repo) in templates_list.as_hash().unwrap().iter() {
-        git_clone(repo.as_str().unwrap(), format!("templates/{}", source.as_str().unwrap()).as_str());
+        git_clone(repo.as_str().unwrap(),
+                  format!("templates/{}", source.as_str().unwrap()).as_str());
     }
 }
 
 fn build_themes() {
-    let mut vec = Vec::new();
-    let templates = fs::read_dir("templates").unwrap();
-    for template in templates {
-        let template_files = fs::read_dir(format!("{}/templates", template.unwrap().path().to_str().unwrap())).unwrap();
-        for tf in template_files {
-            let template_file = tf.unwrap().path();
-            match template_file.extension() {
-                None => {},
-                Some(ext) => {
-                    if ext == "mustache" {
-                        info!("Reading template {}", template_file.display());
-                        vec.push(template_file.clone());
-                    }
-                }
-            };
+    let mut vec = vec![];
+    {
+        for template_dir in fs::read_dir("templates").unwrap() {
+            let template_dir = template_dir.unwrap();
+            let template_path = template_dir.path();
+            let template_path = template_path.to_str();
+            let template_config = &read_yaml_file(format!("{}/templates/config.yaml",
+                                                          template_path.unwrap())
+                .as_str())[0];
+            for (slug, data) in template_config.as_hash().unwrap().iter() {
+                let template_data = {
+                    let mut d = String::new();
+                    info!("Reading template {}/templates/{}.mustache",
+                          template_path.unwrap().to_string(),
+                          slug.as_str().unwrap());
+                    let f = File::open(format!("{}/templates/{}.mustache",
+                                               template_path.unwrap().to_string(),
+                                               slug.as_str().unwrap()))
+                        .unwrap();
+                    let mut input = BufReader::new(f);
+                    input.read_to_string(&mut d).unwrap();
+                    d
+                };
+
+                let template = Template {
+                    dir: template_path.unwrap().to_string(),
+                    extension: data.as_hash()
+                        .unwrap()
+                        .get(&Yaml::from_str("extension"))
+                        .unwrap()
+                        .as_str()
+                        .unwrap()
+                        .to_string(),
+                    output: data.as_hash()
+                        .unwrap()
+                        .get(&Yaml::from_str("output"))
+                        .unwrap()
+                        .as_str()
+                        .unwrap()
+                        .to_string(),
+                    data: template_data,
+                };
+                vec.push(template);
+            }
         }
-    }
 
-    let schemes = fs::read_dir("schemes").unwrap();
+        let schemes_dir = fs::read_dir("schemes").unwrap();
+        for scheme in schemes_dir {
+            let scheme_files = fs::read_dir(scheme.unwrap().path()).unwrap();
+            for sf in scheme_files {
+                let scheme_file = sf.unwrap().path();
+                match scheme_file.extension() {
+                    None => {}
+                    Some(ext) => {
+                        if ext == "yaml" {
+                            info!("Reading scheme {}", scheme_file.display());
+                            let mut data = HashBuilder::new();
+                            let s = &read_yaml_file(scheme_file.to_str().unwrap())[0];
+                            for (attr, value) in s.as_hash().unwrap().iter() {
+                                let key = match attr.as_str().unwrap() {
+                                    "scheme" => "scheme-name".to_string(),
+                                    "author" => "scheme-author".to_string(),
+                                    _ => attr.as_str().unwrap().to_string() + "-hex",
+                                };
+                                data = data.insert(key, value.as_str().unwrap());
+                            }
 
-    for scheme in schemes {
-        let scheme_files = fs::read_dir(scheme.unwrap().path()).unwrap();
-        for sf in scheme_files {
-            let scheme_file = sf.unwrap().path();
-            match scheme_file.extension() {
-                None => {},
-                Some(ext) => {
-                    if ext == "yaml" {
-                        info!("Reading scheme {}", scheme_file.display());
-                        let mut data = HashBuilder::new();
-                        let s = &read_yaml_file(scheme_file.to_str().unwrap())[0];
-                        for (attr, value) in s.as_hash().unwrap().iter() {
-                            data = data.insert_string(attr.as_str().unwrap(), value.as_str().unwrap());
-                        }
-
-                        for t in &vec {
-                            let template = {
-                                let mut buffer = String::new();
-                                let mut file_contents = File::open(t.to_str().unwrap()).unwrap();
-                                file_contents.read_to_string(&mut buffer).unwrap();
-                                buffer
-                            };
-                            let template = data.render(&template).unwrap();
+                            for t in &vec {
+                                info!("Building {}/{}/base16-{}{}",
+                                      t.dir,
+                                      t.output,
+                                      scheme_file.file_stem().unwrap().to_str().unwrap(),
+                                      t.extension);
+                                fs::create_dir(format!("{}/{}", t.dir, t.output));
+                                let f = File::create(format!("{}/{}/base16-{}{}",
+                                                             t.dir,
+                                                             t.output,
+                                                             scheme_file.file_stem()
+                                                                 .unwrap()
+                                                                 .to_str()
+                                                                 .unwrap(),
+                                                             t.extension))
+                                    .unwrap();
+                                let mut out = BufWriter::new(f);
+                                data.render(&t.data, &mut out).unwrap();
+                            }
                         }
                     }
-                }
-            };
+                };
+            }
         }
     }
 }
 
 fn read_yaml_file(file: &str) -> Vec<yaml_rust::Yaml> {
+    debug!("Reading YAML file {}", file);
     let mut src_file = File::open(file).unwrap();
     let mut srcs = String::new();
     src_file.read_to_string(&mut srcs).unwrap();
@@ -117,12 +175,12 @@ fn git_clone(url: &str, path: &str) {
         Ok(_) => {
             // TODO: implement "git pull"
             info!("Updating repo at {}", path);
-        },
+        }
         Err(_) => {
             info!("Cloning repo {}", url);
             match Repository::clone(url, path) {
-               Ok(_) => {},
-               Err(e) => panic!("Failed to clone: {}", e),
+                Ok(_) => {}
+                Err(e) => panic!("Failed to clone: {}", e),
             };
         }
     };

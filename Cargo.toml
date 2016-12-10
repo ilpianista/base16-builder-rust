@@ -4,8 +4,8 @@ version = "0.1.0"
 authors = ["Andrea Scarpino <me@andreascarpino.it>"]
 
 [dependencies]
-git2 = "^0.4"
+git2 = "^0.6"
 env_logger = "^0.3"
 log = "*"
-rustache = "^0.0"
+rustache = "^0.1"
 yaml-rust = "^0.3"
