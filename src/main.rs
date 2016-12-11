@@ -5,6 +5,7 @@ extern crate env_logger;
 extern crate rustache;
 extern crate yaml_rust;
 
+use std::collections::HashMap;
 use git2::Repository;
 use rustache::{Render, HashBuilder};
 use std::fs;
@@ -18,6 +19,14 @@ struct Template {
     data: String,
     extension: String,
     output: String,
+}
+
+#[derive(Debug)]
+struct Scheme {
+    slug: String,
+    name: String,
+    author: String,
+    colors: HashMap<String, String>,
 }
 
 fn main() {
@@ -67,77 +76,37 @@ fn download_sources() {
 fn build_themes() {
     let templates = get_templates();
 
-    let schemes_dir = fs::read_dir("schemes").unwrap();
-    for scheme in schemes_dir {
-        let scheme_files = fs::read_dir(scheme.unwrap().path()).unwrap();
-        for sf in scheme_files {
-            let scheme_file = sf.unwrap().path();
-            match scheme_file.extension() {
-                None => {}
-                Some(ext) => {
-                    if ext == "yaml" {
-                        info!("Reading scheme {}", scheme_file.display());
-                        let mut data = HashBuilder::new();
-                        let s = &read_yaml_file(scheme_file.to_str().unwrap())[0];
-                        for (attr, value) in s.as_hash().unwrap().iter() {
-                            let v = value.as_str().unwrap();
-                            match attr.as_str().unwrap() {
-                                "scheme" => {
-                                    data = data.insert("scheme-name", v);
-                                }
-                                "author" => {
-                                    data = data.insert("scheme-author", v);
-                                }
-                                _ => {
-                                    let key = attr.as_str().unwrap();
-                                    data = data.insert(key.to_string() + "-hex", v);
-                                    data =
-                                        data.insert(key.to_string() + "-hex-r",
-                                                    v[0..2].to_string());
-                                    data = data.insert(key.to_string() + "-rgb-r",
-                                                       i32::from_str_radix(v[0..2].as_ref(), 16)
-                                                           .unwrap());
-                                    data =
-                                        data.insert(key.to_string() + "-hex-g",
-                                                    v[2..4].to_string());
-                                    data = data.insert(key.to_string() + "-rgb-g",
-                                                       i32::from_str_radix(v[2..4].as_ref(), 16)
-                                                           .unwrap());
-                                    data =
-                                        data.insert(key.to_string() + "-hex-b",
-                                                    v[4..6].to_string());
-                                    data = data.insert(key.to_string() + "-rgb-b",
-                                                       i32::from_str_radix(v[4..6].as_ref(), 16)
-                                                           .unwrap());
-                                }
-                            };
-                        }
+    let schemes = get_schemes();
 
-                        for t in &templates {
-                            info!("Building {}/base16-{}{}",
-                                  t.output,
-                                  scheme_file.file_stem().unwrap().to_str().unwrap(),
-                                  t.extension);
-                            data = data.insert("scheme-slug",
-                                               scheme_file.file_stem().unwrap().to_str().unwrap());
-                            fs::create_dir(format!("{}", t.output));
-                            let f = File::create(format!("{}/base16-{}{}",
-                                                         t.output,
-                                                         scheme_file.file_stem()
-                                                             .unwrap()
-                                                             .to_str()
-                                                             .unwrap(),
-                                                         t.extension))
-                                .unwrap();
-                            let mut out = BufWriter::new(f);
-                            data.render(&t.data, &mut out).unwrap();
-                            println!("Built base16-{}{}",
-                                     scheme_file.file_stem().unwrap().to_str().unwrap(),
-                                     t.extension);
-                        }
-                    }
-                }
-            };
+    for s in &schemes {
+        for t in &templates {
+            info!("Building {}/base16-{}{}",
+                  t.output,
+                  s.slug.to_string(),
+                  t.extension);
+            let mut data = HashBuilder::new();
+            data = data.insert("scheme-slug", s.slug.as_ref());
+            data = data.insert("scheme-name", s.name.as_ref());
+            data = data.insert("scheme-author", s.author.as_ref());
+
+            for (base, color) in &s.colors {
+                data = data.insert(base.to_string() + "-hex", color.as_ref());
+                data = data.insert(base.to_string() + "-hex-r", color[0..2].to_string());
+                data = data.insert(base.to_string() + "-rgb-r",
+                                   i32::from_str_radix(color[0..2].as_ref(), 16).unwrap());
+                data = data.insert(base.to_string() + "-hex-g", color[2..4].to_string());
+                data = data.insert(base.to_string() + "-rgb-g",
+                                   i32::from_str_radix(color[2..4].as_ref(), 16).unwrap());
+                data = data.insert(base.to_string() + "-hex-b", color[4..6].to_string());
+                data = data.insert(base.to_string() + "-rgb-b",
+                                   i32::from_str_radix(color[4..6].as_ref(), 16).unwrap());
+            }
+
+            fs::create_dir(format!("{}", t.output));
+            let f = File::create(format!("{}/base16-{}{}", t.output, s.slug, t.extension)).unwrap();
+            let mut out = BufWriter::new(f);
+            data.render(&t.data, &mut out).unwrap();
+            println!("Built base16-{}{}", s.slug, t.extension);
         }
     }
 }
@@ -173,7 +142,7 @@ fn get_templates() -> Vec<Template> {
                     .as_str()
                     .unwrap()
                     .to_string(),
-                output: template_dir_path.to_string() +
+                output: template_dir_path.to_string() + "/" +
                         data.as_hash()
                     .unwrap()
                     .get(&Yaml::from_str("output"))
@@ -186,6 +155,56 @@ fn get_templates() -> Vec<Template> {
         }
     }
     templates
+}
+
+fn get_schemes() -> Vec<Scheme> {
+    let mut schemes = vec![];
+
+    let schemes_dir = fs::read_dir("schemes").unwrap();
+    for scheme in schemes_dir {
+        let scheme_files = fs::read_dir(scheme.unwrap().path()).unwrap();
+        for sf in scheme_files {
+            let scheme_file = sf.unwrap().path();
+            match scheme_file.extension() {
+                None => {}
+                Some(ext) => {
+                    if ext == "yaml" {
+                        info!("Reading scheme {}", scheme_file.display());
+                        let mut scheme_name = String::new();
+                        let mut scheme_author = String::new();
+                        let mut scheme_colors: HashMap<String, String> = HashMap::new();
+
+                        let slug = &read_yaml_file(scheme_file.to_str().unwrap())[0];
+                        for (attr, value) in slug.as_hash().unwrap().iter() {
+                            let v = value.as_str().unwrap().to_string();
+                            match attr.as_str().unwrap() {
+                                "scheme" => {
+                                    scheme_name = v;
+                                }
+                                "author" => {
+                                    scheme_author = v;
+                                }
+                                _ => {
+                                    scheme_colors.insert(attr.as_str().unwrap().to_string(), v);
+                                }
+                            };
+                        }
+
+                        let sc = Scheme {
+                            name: scheme_name,
+                            author: scheme_author,
+                            slug: scheme_file.file_stem().unwrap().to_str().unwrap().to_string(),
+                            colors: scheme_colors,
+                        };
+
+                        schemes.push(sc);
+                    }
+                }
+            };
+        }
+    }
+
+    schemes
 }
 
 fn read_yaml_file(file: &str) -> Vec<yaml_rust::Yaml> {
