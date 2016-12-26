@@ -1,11 +1,16 @@
 language: rust
 rust:
   - stable
-script:
-  - cargo build
+  - beta
+  - nightly
+matrix:
+  allow_failures:
+    - rust: nightly
 addons:
   apt:
     sources:
       - kalakris-cmake
     packages:
       - cmake
+notifications:
+  on_success: change
