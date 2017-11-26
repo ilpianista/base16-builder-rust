@@ -1,6 +1,6 @@
 # Base16 Builder Rust
 
-[![Build Status](https://travis-ci.org/ilpianista/base16-builder-rust.svg?branch=master)](https://travis-ci.org/ilpianista/base16-builder-rust)
+[![Build Status](https://gitlab.com/ilpianista/base16-builder-rust/badges/master/build.svg)](https://gitlab.com/ilpianista/base16-builder-rust/pipelines)
 
 A Rust implementation of a base16 builder that follows the conventions described at https://github.com/chriskempson/base16.
 

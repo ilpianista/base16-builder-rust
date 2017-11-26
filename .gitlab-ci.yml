@@ -1,0 +1,8 @@
+image: rust:latest
+
+test:cargo:
+  script:
+  - apt-get update -y
+  - apt-get install -y cmake
+  - rustc --version && cargo --version      # Print version info for debugging
+  - cargo build --verbose --jobs 1
