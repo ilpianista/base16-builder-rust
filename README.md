@@ -13,8 +13,11 @@ Version 0.9.0.
     git clone https://github.com/ilpianista/base16-builder-rust
     cd base16-builder-rust
     cargo build
-    cargo run
 
 ## Usage
 
-Execute `cargo run` or `base16-builder-rust` to build all templates using all schemes.
+    target/debug/base16-builder update
+Updates all scheme and template repositories as defined in `schemes.yaml` and `templates.yaml`.
+
+    target/debug/base16-builder
+Build all templates using all schemes
