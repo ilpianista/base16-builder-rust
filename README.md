@@ -6,10 +6,6 @@ A Rust implementation of a base16 builder that follows the conventions described
 
 Version 0.9.0.
 
-**This is WIP!**
-
-It does not update existing schemes and existing templates repositories, but knows how to perform a full build.
-
 ## Installation
 
 ### From sources

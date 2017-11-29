@@ -1,0 +1,5 @@
+name: base16-builder
+version: 0.1.0
+subcommands:
+  - update:
+      about: Update schemes and templates

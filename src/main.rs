@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate clap;
 extern crate git2;
 #[macro_use]
 extern crate log;
@@ -5,6 +7,7 @@ extern crate env_logger;
 extern crate rustache;
 extern crate yaml_rust;
 
+use clap::App;
 use std::collections::HashMap;
 use git2::Repository;
 use rustache::{Render, HashBuilder};
@@ -32,8 +35,12 @@ struct Scheme {
 fn main() {
     env_logger::init().unwrap();
 
-    // builder update ->
-    download_sources();
+    let yaml = load_yaml!("cli.yml");
+    let args = App::from_yaml(yaml).get_matches();
+
+    if args.is_present("update") {
+        download_sources();
+    }
 
     // builder ->
     // clean previous execution
@@ -227,8 +234,18 @@ fn read_yaml_file(file: &str) -> Vec<yaml_rust::Yaml> {
 fn git_clone(url: &str, path: &str) {
     match fs::metadata(path) {
         Ok(_) => {
-            // TODO: implement "git pull"
             info!("Updating repo at {}", path);
+            match Repository::open(path) {
+                Ok(repo) => {
+                    let _ = repo.find_remote("origin")
+                        .unwrap()
+                        .fetch(&["master"], None, None);
+                    let oid = repo.refname_to_id("refs/remotes/origin/master").unwrap();
+                    let object = repo.find_object(oid, None).unwrap();
+                    repo.reset(&object, git2::ResetType::Hard, None).unwrap()
+                }
+                Err(e) => panic!("Failed to update: {}", e),
+            };
         }
         Err(_) => {
             info!("Cloning repo {}", url);
