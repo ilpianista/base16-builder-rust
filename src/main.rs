@@ -55,8 +55,10 @@ fn download_sources() {
     let sources = &read_yaml_file("sources.yaml")[0];
 
     for (source, repo) in sources.as_hash().unwrap().iter() {
-        git_clone(repo.as_str().unwrap(),
-                  format!("sources/{}", source.as_str().unwrap()).as_str());
+        git_clone(
+            repo.as_str().unwrap(),
+            format!("sources/{}", source.as_str().unwrap()).as_str(),
+        );
     }
 
     match fs::metadata("sources/schemes/list.yaml") {
@@ -65,8 +67,10 @@ fn download_sources() {
     };
     let sources_list = &read_yaml_file("sources/schemes/list.yaml")[0];
     for (source, repo) in sources_list.as_hash().unwrap().iter() {
-        git_clone(repo.as_str().unwrap(),
-                  format!("schemes/{}", source.as_str().unwrap()).as_str());
+        git_clone(
+            repo.as_str().unwrap(),
+            format!("schemes/{}", source.as_str().unwrap()).as_str(),
+        );
     }
 
     match fs::metadata("sources/templates/list.yaml") {
@@ -75,8 +79,10 @@ fn download_sources() {
     };
     let templates_list = &read_yaml_file("sources/templates/list.yaml")[0];
     for (source, repo) in templates_list.as_hash().unwrap().iter() {
-        git_clone(repo.as_str().unwrap(),
-                  format!("templates/{}", source.as_str().unwrap()).as_str());
+        git_clone(
+            repo.as_str().unwrap(),
+            format!("templates/{}", source.as_str().unwrap()).as_str(),
+        );
     }
 }
 
@@ -87,10 +93,12 @@ fn build_themes() {
 
     for s in &schemes {
         for t in &templates {
-            info!("Building {}/base16-{}{}",
-                  t.output,
-                  s.slug.to_string(),
-                  t.extension);
+            info!(
+                "Building {}/base16-{}{}",
+                t.output,
+                s.slug.to_string(),
+                t.extension
+            );
             let mut data = HashBuilder::new();
             data = data.insert("scheme-slug", s.slug.as_ref());
             data = data.insert("scheme-name", s.name.as_ref());
@@ -116,7 +124,12 @@ fn build_themes() {
             }
 
             let _ = fs::create_dir(format!("{}", t.output));
-            let filename = format!("{}/base16-{}{}", t.output, s.slug.to_lowercase().replace(" ", "_"), t.extension);
+            let filename = format!(
+                "{}/base16-{}{}",
+                t.output,
+                s.slug.to_lowercase().replace(" ", "_"),
+                t.extension
+            );
             let f = File::create(filename).unwrap();
             let mut out = BufWriter::new(f);
             data.render(&t.data, &mut out).unwrap();
@@ -131,12 +144,16 @@ fn get_templates() -> Vec<Template> {
     for template_dir in fs::read_dir("templates").unwrap() {
         let template_dir = template_dir.unwrap().path();
         let template_dir_path = template_dir.to_str().unwrap();
-        let template_config =
-            &read_yaml_file(format!("{}/templates/config.yaml", template_dir_path).as_str())[0];
+        let template_config = &read_yaml_file(
+            format!("{}/templates/config.yaml", template_dir_path).as_str(),
+        )
+            [0];
         for (config, data) in template_config.as_hash().unwrap().iter() {
-            let template_path = format!("{}/templates/{}.mustache",
-                                        template_dir_path.to_string(),
-                                        config.as_str().unwrap());
+            let template_path = format!(
+                "{}/templates/{}.mustache",
+                template_dir_path.to_string(),
+                config.as_str().unwrap()
+            );
             info!("Reading template {}", template_path);
 
             let template_data = {
@@ -157,12 +174,12 @@ fn get_templates() -> Vec<Template> {
                     .unwrap()
                     .to_string(),
                 output: template_dir_path.to_string() + "/" +
-                        data.as_hash()
-                    .unwrap()
-                    .get(&Yaml::from_str("output"))
-                    .unwrap()
-                    .as_str()
-                    .unwrap(),
+                    data.as_hash()
+                        .unwrap()
+                        .get(&Yaml::from_str("output"))
+                        .unwrap()
+                        .as_str()
+                        .unwrap(),
             };
 
             templates.push(template);
@@ -207,7 +224,12 @@ fn get_schemes() -> Vec<Scheme> {
                         let sc = Scheme {
                             name: scheme_name,
                             author: scheme_author,
-                            slug: scheme_file.file_stem().unwrap().to_str().unwrap().to_string(),
+                            slug: scheme_file
+                                .file_stem()
+                                .unwrap()
+                                .to_str()
+                                .unwrap()
+                                .to_string(),
                             colors: scheme_colors,
                         };
 
@@ -237,9 +259,11 @@ fn git_clone(url: &str, path: &str) {
             info!("Updating repo at {}", path);
             match Repository::open(path) {
                 Ok(repo) => {
-                    let _ = repo.find_remote("origin")
-                        .unwrap()
-                        .fetch(&["master"], None, None);
+                    let _ = repo.find_remote("origin").unwrap().fetch(
+                        &["master"],
+                        None,
+                        None,
+                    );
                     let oid = repo.refname_to_id("refs/remotes/origin/master").unwrap();
                     let object = repo.find_object(oid, None).unwrap();
                     repo.reset(&object, git2::ResetType::Hard, None).unwrap()
