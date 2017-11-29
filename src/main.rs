@@ -102,8 +102,9 @@ fn build_themes() {
                                    i32::from_str_radix(color[4..6].as_ref(), 16).unwrap());
             }
 
-            fs::create_dir(format!("{}", t.output));
-            let f = File::create(format!("{}/base16-{}{}", t.output, s.slug, t.extension)).unwrap();
+            let _ = fs::create_dir(format!("{}", t.output));
+            let filename = format!("{}/base16-{}{}", t.output, s.slug.to_lowercase().replace(" ", "_"), t.extension);
+            let f = File::create(filename).unwrap();
             let mut out = BufWriter::new(f);
             data.render(&t.data, &mut out).unwrap();
             println!("Built base16-{}{}", s.slug, t.extension);

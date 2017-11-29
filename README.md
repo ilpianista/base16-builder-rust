@@ -4,7 +4,7 @@
 
 A Rust implementation of a base16 builder that follows the conventions described at https://github.com/chriskempson/base16.
 
-Version 0.8.
+Version 0.8.1.
 
 **This is WIP!**
 
