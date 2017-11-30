@@ -254,6 +254,7 @@ fn read_yaml_file(file: &str) -> Vec<yaml_rust::Yaml> {
 }
 
 fn git_clone(url: &str, path: &str) {
+    println!("-- {}", path);
     match fs::metadata(path) {
         Ok(_) => {
             info!("Updating repo at {}", path);
