@@ -14,6 +14,6 @@ name = "base16-builder"
 clap = {version = "^2", features = ["yaml"]}
 git2 = "^0.6"
 env_logger = "^0.3"
-log = "*"
+log = "^0.3"
 rustache = "^0.1"
 yaml-rust = "^0.4"

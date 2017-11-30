@@ -1,5 +1,6 @@
 # Base16 Builder Rust
 
+[![crats.io](https://img.shields.io/crates/v/base16-builder.svg)](https://crates.io/crates/base16-builder)
 [![Build Status](https://gitlab.com/ilpianista/base16-builder-rust/badges/master/build.svg)](https://gitlab.com/ilpianista/base16-builder-rust/pipelines)
 
 A Rust implementation of a base16 builder that follows the conventions described at https://github.com/chriskempson/base16.
