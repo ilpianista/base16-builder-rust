@@ -8,13 +8,12 @@ extern crate rustache;
 extern crate yaml_rust;
 
 use clap::App;
-use std::collections::HashMap;
 use git2::Repository;
 use rustache::{Render, HashBuilder};
-use std::fs;
-use std::fs::File;
+use std::collections::HashMap;
 use std::io::{BufReader, BufWriter, Read};
-use std::str;
+use std::path::MAIN_SEPARATOR;
+use std::fs::{self, File};
 use yaml_rust::{Yaml, YamlLoader};
 
 #[derive(Debug)]
@@ -42,8 +41,7 @@ fn main() {
         download_sources();
     }
 
-    // builder ->
-    // clean previous execution
+    // TODO: clean previous execution
     build_themes();
 }
 
@@ -52,36 +50,54 @@ fn download_sources() {
         Ok(_) => {}
         Err(_) => panic!("sources.yaml not found"),
     };
-    let sources = &read_yaml_file("sources.yaml")[0];
+    let sources = &read_yaml_file("sources.yaml".to_string())[0];
 
     for (source, repo) in sources.as_hash().unwrap().iter() {
         git_clone(
-            repo.as_str().unwrap(),
-            format!("sources/{}", source.as_str().unwrap()).as_str(),
+            repo.as_str().unwrap().to_string(),
+            format!("sources{}{}", MAIN_SEPARATOR, source.as_str().unwrap()),
         );
     }
 
-    match fs::metadata("sources/schemes/list.yaml") {
+    match fs::metadata(format!(
+        "sources{}schemes{}list.yaml",
+        MAIN_SEPARATOR,
+        MAIN_SEPARATOR
+    )) {
         Ok(_) => {}
         Err(_) => panic!("sources/schemes/list.yaml not found"),
     };
-    let sources_list = &read_yaml_file("sources/schemes/list.yaml")[0];
+    let sources_list = &read_yaml_file(format!(
+        "sources{}schemes{}list.yaml",
+        MAIN_SEPARATOR,
+        MAIN_SEPARATOR
+    ))
+        [0];
     for (source, repo) in sources_list.as_hash().unwrap().iter() {
         git_clone(
-            repo.as_str().unwrap(),
-            format!("schemes/{}", source.as_str().unwrap()).as_str(),
+            repo.as_str().unwrap().to_string(),
+            format!("schemes{}{}", MAIN_SEPARATOR, source.as_str().unwrap()),
         );
     }
 
-    match fs::metadata("sources/templates/list.yaml") {
+    match fs::metadata(format!(
+        "sources{}templates{}list.yaml",
+        MAIN_SEPARATOR,
+        MAIN_SEPARATOR
+    )) {
         Ok(_) => {}
         Err(_) => panic!("sources/templates/list.yaml not found"),
     };
-    let templates_list = &read_yaml_file("sources/templates/list.yaml")[0];
+    let templates_list = &read_yaml_file(format!(
+        "sources{}templates{}list.yaml",
+        MAIN_SEPARATOR,
+        MAIN_SEPARATOR
+    ))
+        [0];
     for (source, repo) in templates_list.as_hash().unwrap().iter() {
         git_clone(
-            repo.as_str().unwrap(),
-            format!("templates/{}", source.as_str().unwrap()).as_str(),
+            repo.as_str().unwrap().to_string(),
+            format!("templates{}{}", MAIN_SEPARATOR, source.as_str().unwrap()),
         );
     }
 }
@@ -125,8 +141,9 @@ fn build_themes() {
 
             let _ = fs::create_dir(format!("{}", t.output));
             let filename = format!(
-                "{}/base16-{}{}",
+                "{}{}base16-{}{}",
                 t.output,
+                MAIN_SEPARATOR,
                 s.slug.to_lowercase().replace(" ", "_"),
                 t.extension
             );
@@ -144,14 +161,19 @@ fn get_templates() -> Vec<Template> {
     for template_dir in fs::read_dir("templates").unwrap() {
         let template_dir = template_dir.unwrap().path();
         let template_dir_path = template_dir.to_str().unwrap();
-        let template_config = &read_yaml_file(
-            format!("{}/templates/config.yaml", template_dir_path).as_str(),
-        )
+        let template_config = &read_yaml_file(format!(
+            "{}{}templates{}config.yaml",
+            template_dir_path,
+            MAIN_SEPARATOR,
+            MAIN_SEPARATOR
+        ))
             [0];
         for (config, data) in template_config.as_hash().unwrap().iter() {
             let template_path = format!(
-                "{}/templates/{}.mustache",
+                "{}{}templates{}{}.mustache",
                 template_dir_path.to_string(),
+                MAIN_SEPARATOR,
+                MAIN_SEPARATOR,
                 config.as_str().unwrap()
             );
             info!("Reading template {}", template_path);
@@ -173,7 +195,7 @@ fn get_templates() -> Vec<Template> {
                     .as_str()
                     .unwrap()
                     .to_string(),
-                output: template_dir_path.to_string() + "/" +
+                output: template_dir_path.to_string() + MAIN_SEPARATOR.to_string().as_str() +
                     data.as_hash()
                         .unwrap()
                         .get(&Yaml::from_str("output"))
@@ -205,7 +227,7 @@ fn get_schemes() -> Vec<Scheme> {
                         let mut scheme_author = String::new();
                         let mut scheme_colors: HashMap<String, String> = HashMap::new();
 
-                        let slug = &read_yaml_file(scheme_file.to_str().unwrap())[0];
+                        let slug = &read_yaml_file(scheme_file.to_string_lossy().into_owned())[0];
                         for (attr, value) in slug.as_hash().unwrap().iter() {
                             let v = value.as_str().unwrap().to_string();
                             match attr.as_str().unwrap() {
@@ -243,19 +265,18 @@ fn get_schemes() -> Vec<Scheme> {
     schemes
 }
 
-fn read_yaml_file(file: &str) -> Vec<yaml_rust::Yaml> {
+fn read_yaml_file(file: String) -> Vec<yaml_rust::Yaml> {
     debug!("Reading YAML file {}", file);
     let mut src_file = File::open(file).unwrap();
     let mut srcs = String::new();
     src_file.read_to_string(&mut srcs).unwrap();
 
-    let sources = YamlLoader::load_from_str(&mut srcs).unwrap();
-    sources
+    YamlLoader::load_from_str(&mut srcs).unwrap()
 }
 
-fn git_clone(url: &str, path: &str) {
+fn git_clone(url: String, path: String) {
     println!("-- {}", path);
-    match fs::metadata(path) {
+    match fs::metadata(path.clone()) {
         Ok(_) => {
             info!("Updating repo at {}", path);
             match Repository::open(path) {
@@ -274,7 +295,7 @@ fn git_clone(url: &str, path: &str) {
         }
         Err(_) => {
             info!("Cloning repo {}", url);
-            match Repository::clone(url, path) {
+            match Repository::clone(url.as_str(), path) {
                 Ok(_) => {}
                 Err(e) => panic!("Failed to clone: {}", e),
             };
