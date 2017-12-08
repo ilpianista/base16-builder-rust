@@ -22,3 +22,11 @@ Updates all scheme and template repositories as defined in `schemes.yaml` and `t
 
     target/debug/base16-builder
 Build all templates using all schemes
+
+## Donate
+
+Donations via [Liberapay](https://liberapay.com/ilpianista) or Bitcoin (1Ph3hFEoQaD4PK6MhL3kBNNh9FZFBfisEH) are always welcomed, _thank you_!
+
+## License
+
+MIT
