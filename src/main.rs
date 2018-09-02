@@ -32,7 +32,7 @@ struct Scheme {
 }
 
 fn main() {
-    env_logger::init().unwrap();
+    env_logger::init();
 
     let yaml = load_yaml!("cli.yml");
     let args = App::from_yaml(yaml).get_matches();

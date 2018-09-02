@@ -11,9 +11,9 @@ readme = "README.md"
 name = "base16-builder"
 
 [dependencies]
-clap = {version = "^2", features = ["yaml"]}
-git2 = "^0.6"
-env_logger = "^0.3"
-log = "^0.3"
-rustache = "^0.1"
-yaml-rust = "^0.4"
+clap = {version = "2", features = ["yaml"]}
+git2 = "0.7"
+env_logger = "0.5"
+log = "0.4"
+rustache = "0.1"
+yaml-rust = "0.4"
