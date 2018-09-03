@@ -193,7 +193,7 @@ fn get_templates() -> Vec<Template> {
                     .get(&Yaml::from_str("extension"))
                     .unwrap()
                     .as_str()
-                    .unwrap()
+                    .unwrap_or("")
                     .to_string(),
                 output: template_dir_path.to_string() + MAIN_SEPARATOR.to_string().as_str() +
                     data.as_hash()
