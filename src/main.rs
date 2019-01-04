@@ -9,11 +9,11 @@ extern crate yaml_rust;
 
 use clap::App;
 use git2::Repository;
-use rustache::{Render, HashBuilder};
+use rustache::{HashBuilder, Render};
 use std::collections::HashMap;
+use std::fs::{self, File};
 use std::io::{BufReader, BufWriter, Read};
 use std::path::MAIN_SEPARATOR;
-use std::fs::{self, File};
 use yaml_rust::{Yaml, YamlLoader};
 
 #[derive(Debug)]
@@ -61,18 +61,15 @@ fn download_sources() {
 
     match fs::metadata(format!(
         "sources{}schemes{}list.yaml",
-        MAIN_SEPARATOR,
-        MAIN_SEPARATOR
+        MAIN_SEPARATOR, MAIN_SEPARATOR
     )) {
         Ok(_) => {}
         Err(_) => panic!("sources/schemes/list.yaml not found"),
     };
     let sources_list = &read_yaml_file(format!(
         "sources{}schemes{}list.yaml",
-        MAIN_SEPARATOR,
-        MAIN_SEPARATOR
-    ))
-        [0];
+        MAIN_SEPARATOR, MAIN_SEPARATOR
+    ))[0];
     for (source, repo) in sources_list.as_hash().unwrap().iter() {
         git_clone(
             repo.as_str().unwrap().to_string(),
@@ -82,18 +79,15 @@ fn download_sources() {
 
     match fs::metadata(format!(
         "sources{}templates{}list.yaml",
-        MAIN_SEPARATOR,
-        MAIN_SEPARATOR
+        MAIN_SEPARATOR, MAIN_SEPARATOR
     )) {
         Ok(_) => {}
         Err(_) => panic!("sources/templates/list.yaml not found"),
     };
     let templates_list = &read_yaml_file(format!(
         "sources{}templates{}list.yaml",
-        MAIN_SEPARATOR,
-        MAIN_SEPARATOR
-    ))
-        [0];
+        MAIN_SEPARATOR, MAIN_SEPARATOR
+    ))[0];
     for (source, repo) in templates_list.as_hash().unwrap().iter() {
         git_clone(
             repo.as_str().unwrap().to_string(),
@@ -163,11 +157,8 @@ fn get_templates() -> Vec<Template> {
         let template_dir_path = template_dir.to_str().unwrap();
         let template_config = &read_yaml_file(format!(
             "{}{}templates{}config.yaml",
-            template_dir_path,
-            MAIN_SEPARATOR,
-            MAIN_SEPARATOR
-        ))
-            [0];
+            template_dir_path, MAIN_SEPARATOR, MAIN_SEPARATOR
+        ))[0];
         for (config, data) in template_config.as_hash().unwrap().iter() {
             let template_path = format!(
                 "{}{}templates{}{}.mustache",
@@ -188,15 +179,18 @@ fn get_templates() -> Vec<Template> {
 
             let template = Template {
                 data: template_data,
-                extension: data.as_hash()
+                extension: data
+                    .as_hash()
                     .unwrap()
                     .get(&Yaml::from_str("extension"))
                     .unwrap()
                     .as_str()
                     .unwrap_or("")
                     .to_string(),
-                output: template_dir_path.to_string() + MAIN_SEPARATOR.to_string().as_str() +
-                    data.as_hash()
+                output: template_dir_path.to_string()
+                    + MAIN_SEPARATOR.to_string().as_str()
+                    + data
+                        .as_hash()
                         .unwrap()
                         .get(&Yaml::from_str("output"))
                         .unwrap()
@@ -281,11 +275,10 @@ fn git_clone(url: String, path: String) {
             info!("Updating repo at {}", path);
             match Repository::open(path) {
                 Ok(repo) => {
-                    let _ = repo.find_remote("origin").unwrap().fetch(
-                        &["master"],
-                        None,
-                        None,
-                    );
+                    let _ = repo
+                        .find_remote("origin")
+                        .unwrap()
+                        .fetch(&["master"], None, None);
                     let oid = repo.refname_to_id("refs/remotes/origin/master").unwrap();
                     let object = repo.find_object(oid, None).unwrap();
                     repo.reset(&object, git2::ResetType::Hard, None).unwrap()
