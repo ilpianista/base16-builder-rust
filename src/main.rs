@@ -71,10 +71,10 @@ fn download_sources() {
     let mut buf2 = Yaml::from_str("-123");
     let mut buf3 = Yaml::from_str("-123");
 
-    let sources = src_builder("sources.yml", &mut buf1);
+    let sources = src_builder("sources.yaml", &mut buf1);
 
     let sources_list_path: &str =
-        &format!("sources{}schemes{}list.yml", MAIN_SEPARATOR, MAIN_SEPARATOR);
+        &format!("sources{}schemes{}list.yaml", MAIN_SEPARATOR, MAIN_SEPARATOR);
     let templates_list_path: &str = &format!(
         "sources{}templates{}list.yaml",
         MAIN_SEPARATOR, MAIN_SEPARATOR
