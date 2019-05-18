@@ -24,6 +24,7 @@ use yaml_rust::{Yaml, YamlLoader};
 struct Source<'a> {
     source: &'a str,
     repo: &'a str,
+    kind: &'a str,
 }
 
 #[derive(Debug)]
@@ -71,7 +72,8 @@ fn download_sources() {
     let mut buf2 = Yaml::from_str("-123");
     let mut buf3 = Yaml::from_str("-123");
 
-    let sources = src_builder("sources.yaml", &mut buf1);
+    let sources = src_builder("sources.yaml", &mut buf1, "sources");
+    src_getter(&sources);
 
     let sources_list_path: &str =
         &format!("sources{}schemes{}list.yaml", MAIN_SEPARATOR, MAIN_SEPARATOR);
@@ -80,10 +82,10 @@ fn download_sources() {
         MAIN_SEPARATOR, MAIN_SEPARATOR
     );
 
-    let sources_list = src_builder(sources_list_path, &mut buf2);
-    let templates_list = src_builder(templates_list_path, &mut buf3);
+    let sources_list = src_builder(sources_list_path, &mut buf2, "schemes");
+    let templates_list = src_builder(templates_list_path, &mut buf3, "templates");
 
-    vec![sources, sources_list, templates_list]
+    vec![sources_list, templates_list]
         .par_iter()
         .for_each(|srcs| {
             src_getter(srcs);
@@ -93,16 +95,16 @@ fn download_sources() {
 /// Gets the provided sources asynchronously
 fn src_getter(srcs: &Vec<Source>) {
     srcs.par_iter().for_each(|src| {
-        let Source { repo, source } = src;
+        let Source { repo, source, kind } = src;
         git_clone(
             repo.to_string(),
-            format!("sources{}{}", MAIN_SEPARATOR, source),
+            format!("{}{}{}",kind, MAIN_SEPARATOR, source),
         );
     });
 }
 
 /// Create a source vector from a given path to a yml file
-fn src_builder<'a, 'b>(src: &'a str, buf: &'b mut Yaml) -> Vec<Source<'b>> {
+fn src_builder<'a, 'b>(src: &'a str, buf: &'b mut Yaml, kind: &'b str) -> Vec<Source<'b>> {
     match fs::metadata(&src) {
         Ok(_) => {}
         Err(_) => {
@@ -119,6 +121,7 @@ fn src_builder<'a, 'b>(src: &'a str, buf: &'b mut Yaml) -> Vec<Source<'b>> {
         .map(|(source, repo)| Source {
             source: source.as_str().unwrap(),
             repo: repo.as_str().unwrap(),
+            kind: kind,
         })
         .collect();
 
