@@ -51,7 +51,6 @@ fn main() {
         download_sources();
     }
 
-    let (theme, template) = (args.value_of("theme"), args.value_of("template"));
     if args.is_present("list") {
         let schemes = get_schemes();
         for scheme in schemes {
@@ -61,20 +60,53 @@ fn main() {
     }
 
     // TODO: clean previous execution
-    build_themes(theme, template);
+    let theme = args.value_of("theme");
+    build_themes(theme);
 }
 
+/// Builds a vec of `Source` structs from sources.yml
+/// and downloads all of the repos in parallel
 fn download_sources() {
-    match fs::metadata("sources.yaml") {
+    let sources = src_builder("sources.yml");
+    let sources_list = src_builder(&format!(
+        "sources{}schemes{}list.yml",
+        MAIN_SEPARATOR, MAIN_SEPARATOR
+    ));
+    let templates_list = src_builder(&format!(
+        "sources{}templates{}list.yaml",
+        MAIN_SEPARATOR, MAIN_SEPARATOR
+    ));
+
+    vec![sources, sources_list, templates_list]
+        .par_iter()
+        .for_each(|srcs| {
+            src_getter(srcs);
+        });
+}
+
+/// Gets the provided sources asynchronously
+fn src_getter(srcs: &Vec<Source>) {
+    srcs.par_iter().for_each(|src| {
+        let Source { repo, source } = src;
+        git_clone(
+            repo.to_string(),
+            format!("sources{}{}", MAIN_SEPARATOR, source),
+        );
+    });
+}
+
+/// Create a source vector from a given path to a yml file
+fn src_builder(src: &str) -> Vec<Source> {
+    match fs::metadata(src) {
         Ok(_) => {}
         Err(_) => {
-            error!("sources.yaml not found");
+            error!("{} not found", src);
             exit(1);
         }
     };
-    let sources = &read_yaml_file("sources.yaml".to_string())[0];
 
-    // for (source, repo) in
+    let sources = &read_yaml_file(src.to_string())[0];
+
     let sources: Vec<Source> = sources
         .as_hash()
         .unwrap()
@@ -85,71 +117,13 @@ fn download_sources() {
         })
         .collect();
 
-    sources.par_iter().for_each(|src| {
-        let Source { repo, source } = src;
-        git_clone(
-            repo.to_string(),
-            format!("sources{}{}", MAIN_SEPARATOR, source),
-        );
-    });
-
-    match fs::metadata(format!(
-        "sources{}schemes{}list.yaml",
-        MAIN_SEPARATOR, MAIN_SEPARATOR
-    )) {
-        Ok(_) => {}
-        Err(_) => {
-            error!("sources/schemes/list.yaml not found");
-            exit(1);
-        }
-    };
-    let sources_list = &read_yaml_file(format!(
-        "sources{}schemes{}list.yaml",
-        MAIN_SEPARATOR, MAIN_SEPARATOR
-    ))[0];
-
-    let sources: Vec<Source> = sources_list
-        .as_hash()
-        .unwrap()
-        .iter()
-        .map(|(source, repo)| Source {
-            source: source.as_str().unwrap(),
-            repo: repo.as_str().unwrap(),
-        })
-        .collect();
-
-    sources.par_iter().for_each(|src| {
-        let Source { repo, source } = src;
-        git_clone(
-            repo.to_string(),
-            format!("sources{}{}", MAIN_SEPARATOR, source),
-        );
-    });
-
-    match fs::metadata(format!(
-        "sources{}templates{}list.yaml",
-        MAIN_SEPARATOR, MAIN_SEPARATOR
-    )) {
-        Ok(_) => {}
-        Err(_) => {
-            error!("sources/templates/list.yaml not found");
-            exit(1);
-        }
-    };
-    let templates_list = &read_yaml_file(format!(
-        "sources{}templates{}list.yaml",
-        MAIN_SEPARATOR, MAIN_SEPARATOR
-    ))[0];
-    for (source, repo) in templates_list.as_hash().unwrap().iter() {
-        git_clone(
-            repo.as_str().unwrap().to_string(),
-            format!("templates{}{}", MAIN_SEPARATOR, source.as_str().unwrap()),
-        );
-    }
+    sources
 }
 
-fn build_themes(theme: Option<&str>, template: Option<&str>) {
-    let mut templates = get_templates();
+/// Takes a maybe theme and if it is a theme,
+/// only builds that theme, if not, builds all themes
+fn build_themes(theme: Option<&str>) {
+    let templates = get_templates();
     let mut schemes = get_schemes();
 
     match theme {
@@ -292,6 +266,8 @@ fn get_templates() -> Vec<Template> {
     templates
 }
 
+/// Reads the schemes directory and parses all the
+/// themes returning a vector with the parsed structures
 fn get_schemes() -> Vec<Scheme> {
     let mut schemes = vec![];
 
@@ -347,6 +323,7 @@ fn get_schemes() -> Vec<Scheme> {
     schemes
 }
 
+/// Self explanatory
 fn read_yaml_file(file: String) -> Vec<yaml_rust::Yaml> {
     debug!("Reading YAML file {}", file);
     let mut src_file = File::open(file).unwrap();
@@ -356,9 +333,10 @@ fn read_yaml_file(file: String) -> Vec<yaml_rust::Yaml> {
     YamlLoader::load_from_str(&mut srcs).unwrap()
 }
 
+/// Updates or clones a given repository into a given path
 fn git_clone(url: String, path: String) {
-    println!("-- {}", path);
-    match fs::metadata(path.clone()) {
+    println!("-- {}", &path);
+    match fs::metadata(&path) {
         Ok(_) => {
             info!("Updating repo at {}", path);
             match Repository::open(path) {

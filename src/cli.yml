@@ -4,9 +4,6 @@ args:
   - theme:
       index: 1
       help: The theme to build
-  - template:
-      index: 2
-      help: The target template, eg, rofi
 subcommands:
   - update:
       about: Update schemes and templates

@@ -13,14 +13,20 @@ Version 0.9.0.
 
     git clone https://github.com/ilpianista/base16-builder-rust
     cd base16-builder-rust
-    cargo build
+    cargo +nightly build --release
 
 ## Usage
 
-    target/debug/base16-builder update
+    target/release/base16-builder update
 Updates all scheme and template repositories as defined in `schemes.yaml` and `templates.yaml`.
 
-    target/debug/base16-builder
+    target/release/base16-builder list
+Lists the available schemes
+
+    target/release/base16-builder <scheme_name>
+Builds all the templates for the desired scheme
+
+    target/release/base16-builder
 Build all templates using all schemes
 
 ## Donate
