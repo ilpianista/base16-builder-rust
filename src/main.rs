@@ -67,15 +67,21 @@ fn main() {
 /// Builds a vec of `Source` structs from sources.yml
 /// and downloads all of the repos in parallel
 fn download_sources() {
-    let sources = src_builder("sources.yml");
-    let sources_list = src_builder(&format!(
-        "sources{}schemes{}list.yml",
-        MAIN_SEPARATOR, MAIN_SEPARATOR
-    ));
-    let templates_list = src_builder(&format!(
+    let mut buf1 = Yaml::from_str("-123");
+    let mut buf2 = Yaml::from_str("-123");
+    let mut buf3 = Yaml::from_str("-123");
+
+    let sources = src_builder("sources.yml", &mut buf1);
+
+    let sources_list_path: &str =
+        &format!("sources{}schemes{}list.yml", MAIN_SEPARATOR, MAIN_SEPARATOR);
+    let templates_list_path: &str = &format!(
         "sources{}templates{}list.yaml",
         MAIN_SEPARATOR, MAIN_SEPARATOR
-    ));
+    );
+
+    let sources_list = src_builder(sources_list_path, &mut buf2);
+    let templates_list = src_builder(templates_list_path, &mut buf3);
 
     vec![sources, sources_list, templates_list]
         .par_iter()
@@ -96,8 +102,8 @@ fn src_getter(srcs: &Vec<Source>) {
 }
 
 /// Create a source vector from a given path to a yml file
-fn src_builder(src: &str) -> Vec<Source> {
-    match fs::metadata(src) {
+fn src_builder<'a, 'b>(src: &'a str, buf: &'b mut Yaml) -> Vec<Source<'b>> {
+    match fs::metadata(&src) {
         Ok(_) => {}
         Err(_) => {
             error!("{} not found", src);
@@ -105,9 +111,8 @@ fn src_builder(src: &str) -> Vec<Source> {
         }
     };
 
-    let sources = &read_yaml_file(src.to_string())[0];
-
-    let sources: Vec<Source> = sources
+    *buf = read_yaml_file(src).remove(0);
+    let sources: Vec<Source> = buf
         .as_hash()
         .unwrap()
         .iter()
@@ -216,7 +221,7 @@ fn get_templates() -> Vec<Template> {
         let template_dir_path = template_dir
             .to_str()
             .expect("Could not cast template_dir into str");
-        let template_config = &read_yaml_file(format!(
+        let template_config = &read_yaml_file(&format!(
             "{}{}templates{}config.yaml",
             template_dir_path, MAIN_SEPARATOR, MAIN_SEPARATOR
         ))[0];
@@ -285,7 +290,7 @@ fn get_schemes() -> Vec<Scheme> {
                         let mut scheme_author = String::new();
                         let mut scheme_colors: HashMap<String, String> = HashMap::new();
 
-                        let slug = &read_yaml_file(scheme_file.to_string_lossy().into_owned())[0];
+                        let slug = &read_yaml_file(&scheme_file.to_string_lossy())[0];
                         for (attr, value) in slug.as_hash().unwrap().iter() {
                             let v = value.as_str().unwrap().to_string();
                             match attr.as_str().unwrap() {
@@ -324,7 +329,7 @@ fn get_schemes() -> Vec<Scheme> {
 }
 
 /// Self explanatory
-fn read_yaml_file(file: String) -> Vec<yaml_rust::Yaml> {
+fn read_yaml_file(file: &str) -> Vec<yaml_rust::Yaml> {
     debug!("Reading YAML file {}", file);
     let mut src_file = File::open(file).unwrap();
     let mut srcs = String::new();
