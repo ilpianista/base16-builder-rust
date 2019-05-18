@@ -1,20 +1,30 @@
+#![feature(drain_filter)]
 #[macro_use]
 extern crate clap;
 extern crate git2;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
+extern crate rayon;
 extern crate rustache;
 extern crate yaml_rust;
 
 use clap::App;
 use git2::Repository;
+use rayon::prelude::*;
 use rustache::{HashBuilder, Render};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{BufReader, BufWriter, Read};
 use std::path::MAIN_SEPARATOR;
+use std::process::exit;
 use yaml_rust::{Yaml, YamlLoader};
+
+#[derive(Debug)]
+struct Source<'a> {
+    source: &'a str,
+    repo: &'a str,
+}
 
 #[derive(Debug)]
 struct Template {
@@ -41,48 +51,90 @@ fn main() {
         download_sources();
     }
 
+    let (theme, template) = (args.value_of("theme"), args.value_of("template"));
+    if args.is_present("list") {
+        let schemes = get_schemes();
+        for scheme in schemes {
+            println!("{}", scheme.name);
+        }
+        exit(0);
+    }
+
     // TODO: clean previous execution
-    build_themes();
+    build_themes(theme, template);
 }
 
 fn download_sources() {
     match fs::metadata("sources.yaml") {
         Ok(_) => {}
-        Err(_) => panic!("sources.yaml not found"),
+        Err(_) => {
+            error!("sources.yaml not found");
+            exit(1);
+        }
     };
     let sources = &read_yaml_file("sources.yaml".to_string())[0];
 
-    for (source, repo) in sources.as_hash().unwrap().iter() {
+    // for (source, repo) in
+    let sources: Vec<Source> = sources
+        .as_hash()
+        .unwrap()
+        .iter()
+        .map(|(source, repo)| Source {
+            source: source.as_str().unwrap(),
+            repo: repo.as_str().unwrap(),
+        })
+        .collect();
+
+    sources.par_iter().for_each(|src| {
+        let Source { repo, source } = src;
         git_clone(
-            repo.as_str().unwrap().to_string(),
-            format!("sources{}{}", MAIN_SEPARATOR, source.as_str().unwrap()),
+            repo.to_string(),
+            format!("sources{}{}", MAIN_SEPARATOR, source),
         );
-    }
+    });
 
     match fs::metadata(format!(
         "sources{}schemes{}list.yaml",
         MAIN_SEPARATOR, MAIN_SEPARATOR
     )) {
         Ok(_) => {}
-        Err(_) => panic!("sources/schemes/list.yaml not found"),
+        Err(_) => {
+            error!("sources/schemes/list.yaml not found");
+            exit(1);
+        }
     };
     let sources_list = &read_yaml_file(format!(
         "sources{}schemes{}list.yaml",
         MAIN_SEPARATOR, MAIN_SEPARATOR
     ))[0];
-    for (source, repo) in sources_list.as_hash().unwrap().iter() {
+
+    let sources: Vec<Source> = sources_list
+        .as_hash()
+        .unwrap()
+        .iter()
+        .map(|(source, repo)| Source {
+            source: source.as_str().unwrap(),
+            repo: repo.as_str().unwrap(),
+        })
+        .collect();
+
+    sources.par_iter().for_each(|src| {
+        let Source { repo, source } = src;
         git_clone(
-            repo.as_str().unwrap().to_string(),
-            format!("schemes{}{}", MAIN_SEPARATOR, source.as_str().unwrap()),
+            repo.to_string(),
+            format!("sources{}{}", MAIN_SEPARATOR, source),
         );
-    }
+    });
 
     match fs::metadata(format!(
         "sources{}templates{}list.yaml",
         MAIN_SEPARATOR, MAIN_SEPARATOR
     )) {
         Ok(_) => {}
-        Err(_) => panic!("sources/templates/list.yaml not found"),
+        Err(_) => {
+            error!("sources/templates/list.yaml not found");
+            exit(1);
+        }
     };
     let templates_list = &read_yaml_file(format!(
         "sources{}templates{}list.yaml",
@@ -96,25 +148,31 @@ fn download_sources() {
     }
 }
 
-fn build_themes() {
-    let templates = get_templates();
+fn build_themes(theme: Option<&str>, template: Option<&str>) {
+    let mut templates = get_templates();
+    let mut schemes = get_schemes();
 
-    let schemes = get_schemes();
+    match theme {
+        Some(theme_name) => {
+            schemes.drain_filter(|thm| thm.name.to_lowercase() != theme_name.to_lowercase());
+        }
+        _ => (),
+    }
 
-    for s in &schemes {
-        for t in &templates {
+    schemes.par_iter().for_each(|scheme| {
+        for template in &templates {
             info!(
                 "Building {}/base16-{}{}",
-                t.output,
-                s.slug.to_string(),
-                t.extension
+                template.output,
+                scheme.slug.to_string(),
+                template.extension
             );
             let mut data = HashBuilder::new();
-            data = data.insert("scheme-slug", s.slug.as_ref());
-            data = data.insert("scheme-name", s.name.as_ref());
-            data = data.insert("scheme-author", s.author.as_ref());
+            data = data.insert("scheme-slug", scheme.slug.as_ref());
+            data = data.insert("scheme-name", scheme.name.as_ref());
+            data = data.insert("scheme-author", scheme.author.as_ref());
 
-            for (base, color) in &s.colors {
+            for (base, color) in &scheme.colors {
                 data = data.insert(base.to_string() + "-hex", color.as_ref());
 
                 data = data.insert(base.to_string() + "-hex-r", color[0..2].to_string());
@@ -133,32 +191,62 @@ fn build_themes() {
                 data = data.insert(base.to_string() + "-dec-b", blue / 255);
             }
 
-            let _ = fs::create_dir(format!("{}", t.output));
+            let _ = fs::create_dir(format!("{}", template.output));
             let filename = format!(
                 "{}{}base16-{}{}",
-                t.output,
+                template.output,
                 MAIN_SEPARATOR,
-                s.slug.to_lowercase().replace(" ", "_"),
-                t.extension
+                scheme.slug.to_lowercase().replace(" ", "_"),
+                template.extension
             );
-            let f = File::create(filename).unwrap();
+            let f = match File::create(&filename) {
+                Ok(result) => result,
+                Err(err) => {
+                    error!("Failed to create {} with \"{}\"", &filename, err);
+                    continue;
+                }
+            };
             let mut out = BufWriter::new(f);
-            data.render(&t.data, &mut out).unwrap();
-            println!("Built base16-{}{}", s.slug, t.extension);
+            match data.render(&template.data, &mut out) {
+                Ok(_) => (),
+                Err(_) => {
+                    error!(
+                        "Data for \"{}-{}\" could not be renderd",
+                        &scheme.slug, &template.extension
+                    );
+                    exit(2);
+                }
+            };
+            println!("Built base16-{}{}", &scheme.slug, &template.extension);
         }
-    }
+    });
 }
 
+/// Goes into the templates dir and for each directory
+/// extracts the templates
 fn get_templates() -> Vec<Template> {
     let mut templates = vec![];
 
-    for template_dir in fs::read_dir("templates").unwrap() {
-        let template_dir = template_dir.unwrap().path();
-        let template_dir_path = template_dir.to_str().unwrap();
+    // Find the templates inside the template dir
+    for template_dir in
+        fs::read_dir("templates").expect("Could not read into the `templates` directory")
+    {
+        let template_dir = match template_dir {
+            Ok(dir) => dir,
+            Err(e) => {
+                error!("Could not access template dir, error: {}", e);
+                exit(2);
+            }
+        }
+        .path();
+        let template_dir_path = template_dir
+            .to_str()
+            .expect("Could not cast template_dir into str");
         let template_config = &read_yaml_file(format!(
             "{}{}templates{}config.yaml",
             template_dir_path, MAIN_SEPARATOR, MAIN_SEPARATOR
         ))[0];
+
         for (config, data) in template_config.as_hash().unwrap().iter() {
             let template_path = format!(
                 "{}{}templates{}{}.mustache",
