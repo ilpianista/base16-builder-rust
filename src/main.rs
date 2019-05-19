@@ -1,4 +1,3 @@
-#![feature(drain_filter)]
 #[macro_use]
 extern crate clap;
 extern crate git2;
@@ -52,17 +51,8 @@ fn main() {
         download_sources();
     }
 
-    if args.is_present("list") {
-        let schemes = get_schemes();
-        for scheme in schemes {
-            println!("{}", scheme.name);
-        }
-        exit(0);
-    }
-
     // TODO: clean previous execution
-    let theme = args.value_of("theme");
-    build_themes(theme);
+    build_themes();
 }
 
 /// Builds a vec of `Source` structs from sources.yml
@@ -130,16 +120,9 @@ fn src_builder<'a, 'b>(src: &'a str, buf: &'b mut Yaml, kind: &'b str) -> Vec<So
 
 /// Takes a maybe theme and if it is a theme,
 /// only builds that theme, if not, builds all themes
-fn build_themes(theme: Option<&str>) {
+fn build_themes() {
     let templates = get_templates();
-    let mut schemes = get_schemes();
-
-    match theme {
-        Some(theme_name) => {
-            schemes.drain_filter(|thm| thm.name.to_lowercase() != theme_name.to_lowercase());
-        }
-        _ => (),
-    }
+    let schemes = get_schemes();
 
     schemes.par_iter().for_each(|scheme| {
         for template in &templates {
