@@ -10,7 +10,7 @@ extern crate yaml_rust;
 use clap::App;
 use git2::Repository;
 use rustache::{HashBuilder, Render};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{BufReader, BufWriter, Read};
 use std::path::MAIN_SEPARATOR;
@@ -98,8 +98,9 @@ fn download_sources() {
 
 fn build_themes() {
     let templates = get_templates();
-
     let schemes = get_schemes();
+
+    let mut filenames = HashSet::new();
 
     for s in &schemes {
         for t in &templates {
@@ -117,20 +118,28 @@ fn build_themes() {
             for (base, color) in &s.colors {
                 data = data.insert(base.to_string() + "-hex", color.as_ref());
 
-                data = data.insert(base.to_string() + "-hex-r", color[0..2].to_string());
+                let hex_red = color[0..2].to_string();
+                data = data.insert(base.to_string() + "-hex-r", hex_red.as_ref());
                 let red = i32::from_str_radix(color[0..2].as_ref(), 16).unwrap();
                 data = data.insert(base.to_string() + "-rgb-r", red);
                 data = data.insert(base.to_string() + "-dec-r", red / 255);
 
-                data = data.insert(base.to_string() + "-hex-g", color[2..4].to_string());
+                let hex_green = color[2..4].to_string();
+                data = data.insert(base.to_string() + "-hex-g", hex_green.as_ref());
                 let green = i32::from_str_radix(color[2..4].as_ref(), 16).unwrap();
                 data = data.insert(base.to_string() + "-rgb-g", green);
                 data = data.insert(base.to_string() + "-dec-g", green / 255);
 
-                data = data.insert(base.to_string() + "-hex-b", color[4..6].to_string());
+                let hex_blue = color[4..6].to_string();
+                data = data.insert(base.to_string() + "-hex-b", hex_blue.as_ref());
                 let blue = i32::from_str_radix(color[4..6].as_ref(), 16).unwrap();
                 data = data.insert(base.to_string() + "-rgb-b", blue);
                 data = data.insert(base.to_string() + "-dec-b", blue / 255);
+
+                data = data.insert(
+                    base.to_string() + "-hex-bgr",
+                    format!("{}{}{}", hex_blue, hex_green, hex_red),
+                );
             }
 
             let _ = fs::create_dir(format!("{}", t.output));
@@ -141,6 +150,13 @@ fn build_themes() {
                 s.slug.to_lowercase().replace(" ", "_"),
                 t.extension
             );
+
+            if filenames.contains(&filename) {
+                println!("\nWarning: {} was overwritten.", filename);
+            } else {
+                filenames.insert(filename.to_string());
+            }
+
             let f = File::create(filename).unwrap();
             let mut out = BufWriter::new(f);
             data.render(&t.data, &mut out).unwrap();
