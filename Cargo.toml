@@ -1,6 +1,6 @@
 [package]
 name = "base16-builder"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Andrea Scarpino <me@andreascarpino.it>"]
 description = "A Rust implementation of a base16 builder"
 repository = "https://github.com/ilpianista/base16-builder-rust"
