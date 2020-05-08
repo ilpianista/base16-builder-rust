@@ -13,8 +13,11 @@ use rustache::{HashBuilder, Render};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{BufReader, BufWriter, Read};
+use std::num::ParseIntError;
 use std::path::MAIN_SEPARATOR;
 use yaml_rust::{Yaml, YamlLoader};
+
+type BuiltFile<'a> = (std::string::String, rustache::HashBuilder<'a>);
 
 #[derive(Debug)]
 struct Template {
@@ -104,65 +107,74 @@ fn build_themes() {
 
     for s in &schemes {
         for t in &templates {
-            info!(
-                "Building {}/base16-{}{}",
-                t.output,
-                s.slug.to_string(),
-                t.extension
-            );
-            let mut data = HashBuilder::new();
-            data = data.insert("scheme-slug", s.slug.as_ref());
-            data = data.insert("scheme-name", s.name.as_ref());
-            data = data.insert("scheme-author", s.author.as_ref());
+            match build_scheme(s, t) {
+                Ok((filename, data)) => {
+                    if filenames.contains(&filename) {
+                        info!("\nWarning: {} was overwritten.", filename);
+                    } else {
+                        filenames.insert(filename.to_string());
+                    }
 
-            for (base, color) in &s.colors {
-                data = data.insert(base.to_string() + "-hex", color.as_ref());
-
-                let hex_red = color[0..2].to_string();
-                data = data.insert(base.to_string() + "-hex-r", hex_red.as_ref());
-                let red = i32::from_str_radix(color[0..2].as_ref(), 16).unwrap();
-                data = data.insert(base.to_string() + "-rgb-r", red);
-                data = data.insert(base.to_string() + "-dec-r", red / 255);
-
-                let hex_green = color[2..4].to_string();
-                data = data.insert(base.to_string() + "-hex-g", hex_green.as_ref());
-                let green = i32::from_str_radix(color[2..4].as_ref(), 16).unwrap();
-                data = data.insert(base.to_string() + "-rgb-g", green);
-                data = data.insert(base.to_string() + "-dec-g", green / 255);
-
-                let hex_blue = color[4..6].to_string();
-                data = data.insert(base.to_string() + "-hex-b", hex_blue.as_ref());
-                let blue = i32::from_str_radix(color[4..6].as_ref(), 16).unwrap();
-                data = data.insert(base.to_string() + "-rgb-b", blue);
-                data = data.insert(base.to_string() + "-dec-b", blue / 255);
-
-                data = data.insert(
-                    base.to_string() + "-hex-bgr",
-                    format!("{}{}{}", hex_blue, hex_green, hex_red),
-                );
+                    let f = File::create(filename).unwrap();
+                    let mut out = BufWriter::new(f);
+                    data.render(&t.data, &mut out).unwrap();
+                    debug!("Built base16-{}{}", s.slug, t.extension);
+                }
+                Err(_) => warn!("Failed to build {} for {}", s.slug.to_string(), t.output),
             }
-
-            let _ = fs::create_dir(format!("{}", t.output));
-            let filename = format!(
-                "{}{}base16-{}{}",
-                t.output,
-                MAIN_SEPARATOR,
-                s.slug.to_lowercase().replace(" ", "_"),
-                t.extension
-            );
-
-            if filenames.contains(&filename) {
-                println!("\nWarning: {} was overwritten.", filename);
-            } else {
-                filenames.insert(filename.to_string());
-            }
-
-            let f = File::create(filename).unwrap();
-            let mut out = BufWriter::new(f);
-            data.render(&t.data, &mut out).unwrap();
-            println!("Built base16-{}{}", s.slug, t.extension);
         }
+        println!("Built {}", s.slug);
     }
+}
+fn build_scheme<'a>(s: &Scheme, t: &'a Template) -> Result<BuiltFile<'a>, ParseIntError> {
+    info!(
+        "Building {}/base16-{}{}",
+        t.output,
+        s.slug.to_string(),
+        t.extension
+    );
+    let mut data = HashBuilder::new();
+    data = data.insert("scheme-slug", s.slug.as_ref());
+    data = data.insert("scheme-name", s.name.as_ref());
+    data = data.insert("scheme-author", s.author.as_ref());
+
+    for (base, color) in &s.colors {
+        data = data.insert(base.to_string() + "-hex", color.as_ref());
+
+        let hex_red = color[0..2].to_string();
+        data = data.insert(base.to_string() + "-hex-r", hex_red.as_ref());
+        let red = i32::from_str_radix(color[0..2].as_ref(), 16)?;
+        data = data.insert(base.to_string() + "-rgb-r", red);
+        data = data.insert(base.to_string() + "-dec-r", red / 255);
+
+        let hex_green = color[2..4].to_string();
+        data = data.insert(base.to_string() + "-hex-g", hex_green.as_ref());
+        let green = i32::from_str_radix(color[2..4].as_ref(), 16)?;
+        data = data.insert(base.to_string() + "-rgb-g", green);
+        data = data.insert(base.to_string() + "-dec-g", green / 255);
+
+        let hex_blue = color[4..6].to_string();
+        data = data.insert(base.to_string() + "-hex-b", hex_blue.as_ref());
+        let blue = i32::from_str_radix(color[4..6].as_ref(), 16)?;
+        data = data.insert(base.to_string() + "-rgb-b", blue);
+        data = data.insert(base.to_string() + "-dec-b", blue / 255);
+
+        data = data.insert(
+            base.to_string() + "-hex-bgr",
+            format!("{}{}{}", hex_blue, hex_green, hex_red),
+        );
+    }
+
+    let _ = fs::create_dir(format!("{}", t.output));
+    let filename = format!(
+        "{}{}base16-{}{}",
+        t.output,
+        MAIN_SEPARATOR,
+        s.slug.to_lowercase().replace(" ", "_"),
+        t.extension
+    );
+
+    Ok((filename, data))
 }
 
 fn get_templates() -> Vec<Template> {
