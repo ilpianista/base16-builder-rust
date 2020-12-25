@@ -122,19 +122,19 @@ fn build_themes() {
                 data = data.insert(base.to_string() + "-hex-r", hex_red.as_ref());
                 let red = i32::from_str_radix(color[0..2].as_ref(), 16).unwrap();
                 data = data.insert(base.to_string() + "-rgb-r", red);
-                data = data.insert(base.to_string() + "-dec-r", red / 255);
+                data = data.insert(base.to_string() + "-dec-r", red as f64 / 255.0);
 
                 let hex_green = color[2..4].to_string();
                 data = data.insert(base.to_string() + "-hex-g", hex_green.as_ref());
                 let green = i32::from_str_radix(color[2..4].as_ref(), 16).unwrap();
                 data = data.insert(base.to_string() + "-rgb-g", green);
-                data = data.insert(base.to_string() + "-dec-g", green / 255);
+                data = data.insert(base.to_string() + "-dec-g", green as f64 / 255.0);
 
                 let hex_blue = color[4..6].to_string();
                 data = data.insert(base.to_string() + "-hex-b", hex_blue.as_ref());
                 let blue = i32::from_str_radix(color[4..6].as_ref(), 16).unwrap();
                 data = data.insert(base.to_string() + "-rgb-b", blue);
-                data = data.insert(base.to_string() + "-dec-b", blue / 255);
+                data = data.insert(base.to_string() + "-dec-b", blue as f64 / 255.0);
 
                 data = data.insert(
                     base.to_string() + "-hex-bgr",
