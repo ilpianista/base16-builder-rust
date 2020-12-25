@@ -142,7 +142,7 @@ fn build_themes() {
                 );
             }
 
-            let _ = fs::create_dir(format!("{}", t.output));
+            let _ = fs::create_dir(t.output.to_string());
             let filename = format!(
                 "{}{}base16-{}{}",
                 t.output,
@@ -281,7 +281,7 @@ fn read_yaml_file(file: String) -> Vec<yaml_rust::Yaml> {
     let mut srcs = String::new();
     src_file.read_to_string(&mut srcs).unwrap();
 
-    YamlLoader::load_from_str(&mut srcs).unwrap()
+    YamlLoader::load_from_str(&srcs).unwrap()
 }
 
 fn git_clone(url: String, path: String) {
