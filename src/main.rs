@@ -142,12 +142,12 @@ fn build_themes() {
                 );
             }
 
-            let _ = fs::create_dir(t.output.to_string());
+            let _ = fs::create_dir(&t.output);
             let filename = format!(
                 "{}{}base16-{}{}",
                 t.output,
                 MAIN_SEPARATOR,
-                s.slug.to_lowercase().replace(" ", "_"),
+                s.slug.to_lowercase().replace(' ', "_"),
                 t.extension
             );
 
@@ -178,7 +178,7 @@ fn get_templates() -> Vec<Template> {
         for (config, data) in template_config.as_hash().unwrap().iter() {
             let template_path = format!(
                 "{}{}templates{}{}.mustache",
-                template_dir_path.to_string(),
+                template_dir_path,
                 MAIN_SEPARATOR,
                 MAIN_SEPARATOR,
                 config.as_str().unwrap()
